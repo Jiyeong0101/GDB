@@ -1,0 +1,32 @@
+첫 번째 CMD
+cd C:\Bitnami\wampstack-8.1.2-0\mariadb\bin
+mysqld.exe --console
+
+이후에 비트나미 들어가서 웨프스택 열어서
+mysql -uroot -pbitnami mysql < create_db.sql
+mysql -urpg -prpg myrpg < rpg.sql
+mysql -urpg -prpg myrpg < populate_rpg.sql
+
+만약 안되면
+두 번째 CMD에서
+cd C:\Bitnami\wampstack-8.1.2-0
+C:\Bitnami\wampstack-8.1.2-0\mariadb\bin\mysql.exe -uroot -pbitnami mysql < create_db.sql
+C:\Bitnami\wampstack-8.1.2-0\mariadb\bin\mysql.exe -uroot -pbitnami myrpg < RPG.sql
+C:\Bitnami\wampstack-8.1.2-0\mariadb\bin\mysql.exe -uroot -pbitnami myrpg < populate_rpg.sql
+
+가상환경 생성
+
+파일경로로 이동
+cd C:\Users\choej\Desktop\GDB
+
+python -m venv venv
+venv\Scripts\activate.bat
+
+필요한 라이브러리 설치
+pip install fastapi uvicorn sqlalchemy pymysql pydantic
+pip install streamlit
+
+실행 
+http://127.0.0.1:8000/docs
+
+streamlit run client.py
