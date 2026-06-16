@@ -6,6 +6,7 @@ mysqld.exe --console
 mysql -uroot -pbitnami mysql < create_db.sql
 mysql -urpg -prpg myrpg < rpg.sql
 mysql -urpg -prpg myrpg < populate_rpg.sql
+mysql -urpg -prpg myrpg < populate_project_scenario.sql
 
 만약 안되면
 두 번째 CMD에서

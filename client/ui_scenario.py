@@ -6,6 +6,7 @@ from client_api import (
     get_my_quests,
     accept_quest,
     run_quest_battle,
+    get_battle_logs,
 )
 
 
@@ -28,6 +29,23 @@ def format_target(quest):
         return "-"
 
     return f"{target['monster_name']} {target['required_count']}마리"
+
+def format_status(status):
+    if status == "active":
+        return "진행 중"
+    if status == "completed":
+        return "완료"
+    if status == "failed":
+        return "실패"
+    return status or "-"
+
+
+def format_progress(quest):
+    target = quest.get("target") or {}
+    required_count = target.get("required_count", quest.get("max_steps", 1))
+    current_step = quest.get("current_step", 0)
+
+    return f"{current_step} / {required_count}"
 
 
 def render_available_quests():
@@ -113,8 +131,8 @@ def render_my_quests():
             {
                 "퀘스트ID": q["quest_id"],
                 "퀘스트명": q["name"],
-                "상태": q.get("status") or "-",
-                "진행도": f"{q.get('current_step', 0)} / {q.get('target', {}).get('required_count', q.get('max_steps', 1))}",
+                "상태": format_status(q.get("status")),
+                "진행도": format_progress(q),
                 "목표": format_target(q),
                 "보상": format_reward(q),
             }
@@ -123,6 +141,18 @@ def render_my_quests():
         st.dataframe(df, use_container_width=True, hide_index=True)
 
         active_quests = [q for q in quests if q.get("status") == "active"]
+        
+        for q in active_quests:
+            target = q.get("target") or {}
+            required_count = target.get("required_count", q.get("max_steps", 1))
+            current_step = q.get("current_step", 0)
+
+            progress_value = 0
+            if required_count > 0:
+                progress_value = current_step / required_count
+
+            st.write(f"진행 중: {q['name']} ({current_step}/{required_count})")
+            st.progress(progress_value)
 
         if not active_quests:
             st.info("현재 전투를 진행할 활성 퀘스트가 없습니다.")
@@ -181,3 +211,50 @@ def render_quest_scenario():
 
     render_available_quests()
     render_my_quests()
+    render_battle_logs()
+
+def render_battle_logs():
+    st.markdown("#### 🧾 전투 기록")
+
+    try:
+        res = get_battle_logs(
+            st.session_state.user_id,
+            st.session_state.cookies
+        )
+
+        if res.status_code != 200:
+            st.error(
+                res.json().get(
+                    "detail",
+                    "전투 기록을 불러오지 못했습니다."
+                )
+            )
+            return
+
+        logs = res.json()
+
+        if not logs:
+            st.info("아직 전투 기록이 없습니다.")
+            return
+
+        df = pd.DataFrame([
+            {
+                "시간": log.get("battle_time"),
+                "캐릭터": log.get("character_name"),
+                "퀘스트": log.get("quest_name") or "-",
+                "몬스터": log.get("monster_name") or "-",
+                "결과": "승리" if log.get("result") == "victory" else log.get("result"),
+                "획득 EXP": log.get("gained_exp", 0),
+                "메시지": log.get("message") or "-"
+            }
+            for log in logs
+        ])
+
+        st.dataframe(
+            df,
+            use_container_width=True,
+            hide_index=True
+        )
+
+    except Exception as e:
+        st.error(f"서버 오류: {e}")

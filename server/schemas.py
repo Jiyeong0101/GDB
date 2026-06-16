@@ -118,3 +118,16 @@ class BattleResponse(BaseModel):
     quest_status: str
     reward: BattleRewardResponse
     message: str
+
+class BattleLogResponse(BaseModel):
+    id: int
+    char_id: int
+    character_name: str
+    quest_id: Optional[int] = None
+    quest_name: Optional[str] = None
+    monster_actor_id: Optional[int] = None
+    monster_name: Optional[str] = None
+    result: str
+    gained_exp: int
+    message: Optional[str] = None
+    battle_time: Optional[str] = None

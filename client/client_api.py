@@ -119,3 +119,9 @@ def run_quest_battle(user_id: str, quest_id: int, cookies):
         f"{BASE_URL}/users/{user_id}/quests/{quest_id}/battle",
         cookies=cookies
     )
+
+def get_battle_logs(user_id: str, cookies):
+    return requests.get(
+        f"{BASE_URL}/users/{user_id}/quests/battle-logs",
+        cookies=cookies
+    )

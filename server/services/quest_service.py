@@ -1,5 +1,6 @@
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 from models import (
     CharacterModel,
@@ -7,6 +8,7 @@ from models import (
     InventoryModel,
     InventoryItemModel,
     ItemModel,
+    BattleLogModel,
 )
 
 
@@ -137,3 +139,24 @@ def give_quest_reward(db: Session, character: CharacterModel, quest_id: int):
         )
 
     return reward
+
+def create_battle_log(
+    db: Session,
+    char_id: int,
+    quest_id: int,
+    monster_actor_id: int,
+    result: str,
+    gained_exp: int,
+    message: str
+):
+    battle_log = BattleLogModel(
+    char_id=char_id,
+    quest_id=quest_id,
+    monster_actor_id=monster_actor_id,
+    result=result,
+    gained_exp=gained_exp,
+    message=message,
+    battle_time=datetime.now()
+    )
+
+    db.add(battle_log)

@@ -1,5 +1,6 @@
 from sqlalchemy import Column, String, Integer, Boolean, ForeignKey, Text, Float, DateTime
 from database import Base
+from sqlalchemy import text
 
 
 # ==========================================
@@ -224,3 +225,15 @@ class QuestRewardModel(Base):
 
     quest_id = Column(Integer, ForeignKey("Quest.id"), primary_key=True)
     reward_id = Column(Integer, ForeignKey("Reward.id"), primary_key=True)
+
+class BattleLogModel(Base):
+    __tablename__ = "BattleLog"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    char_id = Column(Integer, ForeignKey("Character.actor_id"), nullable=False)
+    quest_id = Column(Integer, ForeignKey("Quest.id"))
+    monster_actor_id = Column(Integer, ForeignKey("Monster.actor_id"))
+    result = Column(String(50), nullable=False)
+    gained_exp = Column(Integer, nullable=False, default=0)
+    message = Column(String(255))
+    battle_time = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
