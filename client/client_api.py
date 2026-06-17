@@ -137,3 +137,13 @@ def attack_encounter(user_id: str, quest_id: int, skill_id: int, cookies):
 
 def get_battle_logs(user_id: str, cookies):
     return requests.get(f"{BASE_URL}/users/{user_id}/battle-logs", cookies=cookies)
+
+# ==========================================
+# item
+# ==========================================
+
+def use_mana_potion(user_id: str, cookies):
+    return requests.post(
+        f"{BASE_URL}/users/{user_id}/items/mana-potion/use",
+        cookies=cookies
+    )

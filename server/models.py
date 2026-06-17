@@ -45,6 +45,13 @@ class ItemModel(Base):
     sub_type = Column(String(50))
     capacity = Column(Integer, default=-1)
 
+class ItemBonusStatModel(Base):
+    __tablename__ = "ItemBonusStat"
+
+    item_id = Column(Integer, ForeignKey("Item.id"), primary_key=True)
+    stat_type = Column(String(50), ForeignKey("Stat.type"), primary_key=True)
+    value = Column(Integer, nullable=False)
+
 
 class InventoryModel(Base):
     __tablename__ = "Inventory"

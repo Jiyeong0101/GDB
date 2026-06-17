@@ -11,6 +11,7 @@ from routers import (
     villagers,
     encounters,
     logs,
+    consumables,
 )
 
 app = FastAPI(
@@ -27,6 +28,7 @@ app.include_router(quests.router)
 app.include_router(villagers.router)
 app.include_router(encounters.router)
 app.include_router(logs.router)
+app.include_router(consumables.router)
 
 
 @app.get("/")

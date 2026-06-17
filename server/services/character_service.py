@@ -62,7 +62,7 @@ def initialize_character_defaults(db: Session, actor_id: int, race: str):
         )
 
     stat_values["HP"] = stat_values.get("MAX_HP", stat_values.get("HP", 0))
-    stat_values["MP"] = stat_values.get("MAX_MP", stat_values.get("MP", 0))
+    stat_values["MP"] = min(10, stat_values.get("MAX_MP", 10))
 
     for stat_type, value in stat_values.items():
         db.add(
@@ -93,7 +93,8 @@ def initialize_character_defaults(db: Session, actor_id: int, race: str):
     # =========================
     default_items = [
         {"item_id": 1, "quantity": 1},
-        {"item_id": 6, "quantity": 3},
+        {"item_id": 6, "quantity": 1},
+        {"item_id": 7, "quantity": 1},  # 마나 포션
     ]
 
     for default_item in default_items:

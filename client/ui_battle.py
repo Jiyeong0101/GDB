@@ -1,6 +1,6 @@
 import streamlit as st
 
-from client_api import get_my_quests, start_encounter, get_encounter, attack_encounter
+from client_api import get_my_quests, start_encounter, get_encounter, attack_encounter, get_active_character, use_mana_potion
 from ui_quests import format_target
 
 
@@ -114,6 +114,8 @@ def render_battle_page():
         st.write(f"HP: {encounter['monster_current_hp']} / {encounter['monster_max_hp']}")
         st.progress(hp_ratio)
 
+        render_mana_potion_panel()
+
         if encounter["status"] != "active":
             st.info("이 전투는 종료되었습니다. 퀘스트/기록 탭에서 결과를 확인하세요.")
             return
@@ -142,3 +144,61 @@ def render_battle_page():
 
     except Exception as e:
         st.error(f"서버 오류: {e}")
+
+
+def get_stat_value(character, stat_type):
+    for stat in character.get("stats", []):
+        if stat.get("stat_type") == stat_type:
+            return stat.get("value", 0)
+    return 0
+
+def get_item_quantity(character, item_name):
+    total = 0
+
+    for item in character.get("inventory", []):
+        if item.get("item_name") == item_name:
+            total += item.get("quantity", 0)
+
+    return total
+
+
+def render_mana_potion_panel():
+    st.markdown("#### 🧪 마나 회복")
+
+    detail_res = get_active_character(
+        st.session_state.user_id,
+        st.session_state.cookies
+    )
+
+    if detail_res.status_code != 200:
+        st.warning("캐릭터 MP 정보를 불러오지 못했습니다.")
+        return
+
+    character = detail_res.json()
+
+    current_mp = get_stat_value(character, "MP")
+    max_mp = get_stat_value(character, "MAX_MP")
+    potion_count = get_item_quantity(character, "마나 포션")
+
+    st.write(f"현재 MP: {current_mp} / {max_mp}")
+    st.write(f"보유 마나 포션: {potion_count}개")
+
+    disabled = potion_count <= 0 or current_mp >= max_mp
+
+    if st.button("마나 포션 사용", disabled=disabled):
+        use_res = use_mana_potion(
+            st.session_state.user_id,
+            st.session_state.cookies
+        )
+
+        if use_res.status_code == 200:
+            result = use_res.json()
+            st.success(result.get("message", "마나 포션을 사용했습니다."))
+            st.rerun()
+        else:
+            st.error(
+                use_res.json().get(
+                    "detail",
+                    "마나 포션 사용 실패"
+                )
+            )
