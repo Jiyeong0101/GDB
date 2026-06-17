@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 
@@ -98,7 +98,7 @@ class QuestSummaryResponse(BaseModel):
     source: Optional[str] = None
     target: Optional[QuestTargetResponse] = None
     reward_exp: int = 0
-    reward_items: list[QuestRewardItemResponse] = []
+    reward_items: list[QuestRewardItemResponse] = Field(default_factory=list)
 
 
 class QuestAcceptResponse(BaseModel):
@@ -119,9 +119,9 @@ class LearnedSkillResponse(BaseModel):
 
 class BattleRewardResponse(BaseModel):
     exp: int = 0
-    items: list[QuestRewardItemResponse] = []
-    level_ups: list[int] = []
-    learned_skills: list[LearnedSkillResponse] = []
+    items: list[QuestRewardItemResponse] = Field(default_factory=list)
+    level_ups: list[int] = Field(default_factory=list)
+    learned_skills: list[LearnedSkillResponse] = Field(default_factory=list)
 
 
 # ==========================================
@@ -158,7 +158,7 @@ class EncounterResponse(BaseModel):
     monster_max_hp: int
     status: str
     turn_count: int
-    skills: list[SkillOptionResponse] = []
+    skills: list[SkillOptionResponse] = Field(default_factory=list)
 
 
 class AttackRequest(BaseModel):

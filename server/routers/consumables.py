@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from auth import get_current_user
 from database import get_db
+from constants import MAIN_BAG_TYPE, MANA_POTION_DEFAULT_RECOVER, MANA_POTION_ITEM_ID
 from models import (
     ActorStatModel,
     InventoryModel,
@@ -18,7 +19,6 @@ router = APIRouter(
     tags=["Consumables"]
 )
 
-MANA_POTION_ITEM_ID = 7
 
 
 def check_user_permission(user_id: str, current_user):
@@ -63,7 +63,7 @@ def use_mana_potion(
 
     inventory = db.query(InventoryModel).filter(
         InventoryModel.owner_id == character.actor_id,
-        InventoryModel.type == "MAIN_BAG"
+        InventoryModel.type == MAIN_BAG_TYPE
     ).first()
 
     if not inventory:
@@ -116,7 +116,7 @@ def use_mana_potion(
         ItemBonusStatModel.stat_type == "MP"
     ).first()
 
-    recover_amount = bonus.value if bonus else 30
+    recover_amount = bonus.value if bonus else MANA_POTION_DEFAULT_RECOVER
 
     after_mp = min(max_mp, before_mp + recover_amount)
     real_recovered = after_mp - before_mp

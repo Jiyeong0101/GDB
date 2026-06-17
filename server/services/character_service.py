@@ -1,4 +1,11 @@
 from sqlalchemy.orm import Session
+from constants import (
+    DEFAULT_BAG_CAPACITY,
+    DEFAULT_BAG_ITEM_ID,
+    MAIN_BAG_TYPE,
+    MANA_POTION_ITEM_ID,
+    TUTORIAL_QUEST_ID,
+)
 from models import (
     StatModel,
     ActorStatModel,
@@ -14,8 +21,6 @@ from models import (
     CharacterQuestModel,
 )
 
-
-TUTORIAL_QUEST_ID = 100
 
 
 def initialize_character_defaults(db: Session, actor_id: int, race: str):
@@ -76,12 +81,12 @@ def initialize_character_defaults(db: Session, actor_id: int, race: str):
     # =========================
     # 2. 기본 인벤토리 생성
     # =========================
-    default_bag_item = db.query(ItemModel).filter(ItemModel.id == 13).first()
-    bag_capacity = default_bag_item.capacity if default_bag_item else 20
+    default_bag_item = db.query(ItemModel).filter(ItemModel.id == DEFAULT_BAG_ITEM_ID).first()
+    bag_capacity = default_bag_item.capacity if default_bag_item else DEFAULT_BAG_CAPACITY
 
     new_inventory = InventoryModel(
         owner_id=actor_id,
-        type="MAIN_BAG",
+        type=MAIN_BAG_TYPE,
         capacity=bag_capacity
     )
 
@@ -94,7 +99,7 @@ def initialize_character_defaults(db: Session, actor_id: int, race: str):
     default_items = [
         {"item_id": 1, "quantity": 1},
         {"item_id": 6, "quantity": 1},
-        {"item_id": 7, "quantity": 1},  # 마나 포션
+        {"item_id": MANA_POTION_ITEM_ID, "quantity": 1},  # 마나 포션
     ]
 
     for default_item in default_items:

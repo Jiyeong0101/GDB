@@ -1,21 +1,36 @@
 import requests
+from requests.adapters import HTTPAdapter
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://127.0.0.1:8000"
+REQUEST_TIMEOUT = 5
 
+_session = requests.Session()
+_adapter = HTTPAdapter(pool_connections=20, pool_maxsize=20)
+_session.mount("http://", _adapter)
+_session.mount("https://", _adapter)
+
+def _request(method: str, path: str, **kwargs):
+    return _session.request(
+        method=method,
+        url=f"{BASE_URL}{path}",
+        timeout=REQUEST_TIMEOUT,
+        **kwargs
+    )
 
 # ==========================================
 # Auth API
 # ==========================================
 
 def login(user_id: str, password: str):
-    return requests.post(
-        f"{BASE_URL}/login",
+    return _request(
+        "POST",
+        "/login",
         json={"user_id": user_id, "password": password}
     )
 
 
 def logout(cookies):
-    return requests.post(f"{BASE_URL}/logout", cookies=cookies)
+    return _request("POST", "/logout", cookies=cookies)
 
 
 # ==========================================
@@ -23,8 +38,9 @@ def logout(cookies):
 # ==========================================
 
 def create_user(user_identifier: str, nickname: str, password: str):
-    return requests.post(
-        f"{BASE_URL}/users",
+    return _request(
+        "POST",
+        "/users",
         json={
             "user_identifier": user_identifier,
             "nickname": nickname,
@@ -34,7 +50,7 @@ def create_user(user_identifier: str, nickname: str, password: str):
 
 
 def delete_current_user(cookies):
-    return requests.delete(f"{BASE_URL}/users/me", cookies=cookies)
+    return _request("DELETE", "/users/me", cookies=cookies)
 
 
 # ==========================================
@@ -42,33 +58,36 @@ def delete_current_user(cookies):
 # ==========================================
 
 def get_characters(user_id: str, cookies):
-    return requests.get(f"{BASE_URL}/users/{user_id}/characters", cookies=cookies)
+    return _request("GET", f"/users/{user_id}/characters", cookies=cookies)
 
 
 def create_character(user_id: str, character_name: str, race: str, cookies):
-    return requests.post(
-        f"{BASE_URL}/users/{user_id}/characters",
+    return _request(
+        "POST",
+        f"/users/{user_id}/characters",
         json={"character_name": character_name, "race": race},
         cookies=cookies
     )
 
 
 def activate_character(user_id: str, actor_id: int, cookies):
-    return requests.patch(
-        f"{BASE_URL}/users/{user_id}/characters/{actor_id}/activate",
+    return _request(
+        "PATCH",
+        f"/users/{user_id}/characters/{actor_id}/activate",
         cookies=cookies
     )
 
 
 def delete_character(user_id: str, actor_id: int, cookies):
-    return requests.delete(
-        f"{BASE_URL}/users/{user_id}/characters/{actor_id}",
+    return _request(
+        "DELETE",
+        f"/users/{user_id}/characters/{actor_id}",
         cookies=cookies
     )
 
 
 def get_active_character(user_id: str, cookies):
-    return requests.get(f"{BASE_URL}/users/{user_id}/active-character", cookies=cookies)
+    return _request("GET", f"/users/{user_id}/active-character", cookies=cookies)
 
 
 # ==========================================
@@ -76,16 +95,17 @@ def get_active_character(user_id: str, cookies):
 # ==========================================
 
 def get_available_quests(user_id: str, cookies):
-    return requests.get(f"{BASE_URL}/users/{user_id}/quests/available", cookies=cookies)
+    return _request("GET", f"/users/{user_id}/quests/available", cookies=cookies)
 
 
 def get_my_quests(user_id: str, cookies):
-    return requests.get(f"{BASE_URL}/users/{user_id}/quests/my", cookies=cookies)
+    return _request("GET", f"/users/{user_id}/quests/my", cookies=cookies)
 
 
 def accept_quest(user_id: str, quest_id: int, cookies):
-    return requests.post(
-        f"{BASE_URL}/users/{user_id}/quests/{quest_id}/accept",
+    return _request(
+        "POST",
+        f"/users/{user_id}/quests/{quest_id}/accept",
         cookies=cookies
     )
 
@@ -95,12 +115,13 @@ def accept_quest(user_id: str, quest_id: int, cookies):
 # ==========================================
 
 def get_villagers(user_id: str, cookies):
-    return requests.get(f"{BASE_URL}/users/{user_id}/villagers", cookies=cookies)
+    return _request("GET", f"/users/{user_id}/villagers", cookies=cookies)
 
 
 def get_villager_quests(user_id: str, villager_id: int, cookies):
-    return requests.get(
-        f"{BASE_URL}/users/{user_id}/villagers/{villager_id}/quests",
+    return _request(
+        "GET",
+        f"/users/{user_id}/villagers/{villager_id}/quests",
         cookies=cookies
     )
 
@@ -110,22 +131,25 @@ def get_villager_quests(user_id: str, villager_id: int, cookies):
 # ==========================================
 
 def start_encounter(user_id: str, quest_id: int, cookies):
-    return requests.post(
-        f"{BASE_URL}/users/{user_id}/quests/{quest_id}/encounter/start",
+    return _request(
+        "POST",
+        f"/users/{user_id}/quests/{quest_id}/encounter/start",
         cookies=cookies
     )
 
 
 def get_encounter(user_id: str, quest_id: int, cookies):
-    return requests.get(
-        f"{BASE_URL}/users/{user_id}/quests/{quest_id}/encounter",
+    return _request(
+        "GET",
+        f"/users/{user_id}/quests/{quest_id}/encounter",
         cookies=cookies
     )
 
 
 def attack_encounter(user_id: str, quest_id: int, skill_id: int, cookies):
-    return requests.post(
-        f"{BASE_URL}/users/{user_id}/quests/{quest_id}/encounter/attack",
+    return _request(
+        "POST",
+        f"/users/{user_id}/quests/{quest_id}/encounter/attack",
         json={"skill_id": skill_id},
         cookies=cookies
     )
@@ -136,14 +160,16 @@ def attack_encounter(user_id: str, quest_id: int, skill_id: int, cookies):
 # ==========================================
 
 def get_battle_logs(user_id: str, cookies):
-    return requests.get(f"{BASE_URL}/users/{user_id}/battle-logs", cookies=cookies)
+    return _request("GET", f"/users/{user_id}/battle-logs", cookies=cookies)
+
 
 # ==========================================
-# item
+# Consumable Item API
 # ==========================================
 
 def use_mana_potion(user_id: str, cookies):
-    return requests.post(
-        f"{BASE_URL}/users/{user_id}/items/mana-potion/use",
+    return _request(
+        "POST",
+        f"/users/{user_id}/items/mana-potion/use",
         cookies=cookies
     )

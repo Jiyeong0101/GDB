@@ -2,6 +2,11 @@ from datetime import datetime
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from constants import (
+    DEFAULT_BAG_CAPACITY,
+    DEFAULT_BAG_ITEM_ID,
+    MAIN_BAG_TYPE,
+)
 from models import (
     ActorStatModel,
     BattleLogModel,
@@ -88,18 +93,18 @@ def get_quest_reward_summary(db: Session, quest_id: int):
 def ensure_main_inventory(db: Session, char_id: int):
     inventory = db.query(InventoryModel).filter(
         InventoryModel.owner_id == char_id,
-        InventoryModel.type == "MAIN_BAG"
+        InventoryModel.type == MAIN_BAG_TYPE
     ).first()
 
     if inventory:
         return inventory
 
-    default_bag = db.query(ItemModel).filter(ItemModel.id == 13).first()
-    capacity = default_bag.capacity if default_bag else 20
+    default_bag = db.query(ItemModel).filter(ItemModel.id == DEFAULT_BAG_ITEM_ID).first()
+    capacity = default_bag.capacity if default_bag else DEFAULT_BAG_CAPACITY
 
     inventory = InventoryModel(
         owner_id=char_id,
-        type="MAIN_BAG",
+        type=MAIN_BAG_TYPE,
         capacity=capacity
     )
     db.add(inventory)
@@ -186,9 +191,12 @@ def apply_level_stat_growth(db: Session, character: CharacterModel, old_level: i
         mp_delta = int(new_master.max_mp - old_master.max_mp)
 
         add_actor_stat_value(db, character.actor_id, "MAX_HP", hp_delta)
-        #add_actor_stat_value(db, character.actor_id, "HP", hp_delta)
+        # HP는 레벨업 보상 체감을 위해 증가분만큼 현재 HP도 회복한다.
+        add_actor_stat_value(db, character.actor_id, "HP", hp_delta)
+
         add_actor_stat_value(db, character.actor_id, "MAX_MP", mp_delta)
-        #add_actor_stat_value(db, character.actor_id, "MP", mp_delta)
+        # MP는 스킬 자원이므로 레벨업 시 현재 MP는 자동 회복하지 않는다.
+        # add_actor_stat_value(db, character.actor_id, "MP", mp_delta)
 
     old_base = get_level_base_stat_dict(db, old_level)
     new_base = get_level_base_stat_dict(db, new_level)

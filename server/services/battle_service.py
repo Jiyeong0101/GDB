@@ -3,6 +3,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
+from constants import DEFAULT_SKILL_DAMAGE_BONUS, SKILL_DAMAGE_BONUS
 from models import (
     ActorStatModel,
     BattleEncounterModel,
@@ -109,14 +110,7 @@ def get_character_skill_options(db: Session, char_id: int):
 
 def calculate_damage(player_atk: int, skill_id: int, skill_level: float, monster_def: int) -> int:
     # 클릭형 단순 전투: 스킬마다 보정값을 다르게 두어 새 스킬 획득 효과를 보여준다.
-    skill_bonus_map = {
-        1: 5,    # 기본 베기
-        2: 12,   # 연속 베기
-        3: 18,   # 분노의 일격
-        5: 16,   # 파이어볼
-        7: 10,   # 돌진
-    }
-    base_bonus = skill_bonus_map.get(skill_id, 5)
+    base_bonus = SKILL_DAMAGE_BONUS.get(skill_id, DEFAULT_SKILL_DAMAGE_BONUS)
     level_bonus = int(max(skill_level - 1.0, 0) * 3)
     return max(1, player_atk + base_bonus + level_bonus - monster_def)
 
