@@ -1,4 +1,4 @@
-첫 번째 CMD
+첫 번째 CMD 에서
 cd C:\Bitnami\wampstack-8.1.2-0\mariadb\bin
 mysqld.exe --console
 
@@ -7,13 +7,6 @@ mysql -uroot -pbitnami mysql < create_db.sql
 mysql -urpg -prpg myrpg < rpg.sql
 mysql -urpg -prpg myrpg < populate_rpg.sql
 mysql -urpg -prpg myrpg < populate_project_scenario.sql
-
-만약 안되면
-두 번째 CMD에서
-cd C:\Bitnami\wampstack-8.1.2-0
-C:\Bitnami\wampstack-8.1.2-0\mariadb\bin\mysql.exe -uroot -pbitnami mysql < create_db.sql
-C:\Bitnami\wampstack-8.1.2-0\mariadb\bin\mysql.exe -uroot -pbitnami myrpg < RPG.sql
-C:\Bitnami\wampstack-8.1.2-0\mariadb\bin\mysql.exe -uroot -pbitnami myrpg < populate_rpg.sql
 
 가상환경 생성
 

@@ -1,14 +1,19 @@
+from datetime import datetime
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-from datetime import datetime
 
 from models import (
+    ActorStatModel,
+    BattleLogModel,
     CharacterModel,
-    CharacterQuestModel,
+    CharacterSkillModel,
     InventoryModel,
     InventoryItemModel,
     ItemModel,
-    BattleLogModel,
+    LevelBaseStatModel,
+    LevelMasterModel,
+    ProjectLevelSkillRewardModel,
+    SkillModel,
 )
 
 
@@ -30,10 +35,9 @@ def get_quest_target(db: Session, quest_id: int):
                 m.hp,
                 m.atk,
                 m.def AS monster_def,
-                COALESCE(qmt.target_name, c.character_name) AS monster_name
+                COALESCE(qmt.target_name, CONCAT('Monster ', qmt.monster_actor_id)) AS monster_name
             FROM QuestMonsterTarget qmt
             JOIN Monster m ON qmt.monster_actor_id = m.actor_id
-            LEFT JOIN `Character` c ON c.actor_id = m.actor_id
             WHERE qmt.quest_id = :quest_id
             LIMIT 1
         """),
@@ -122,6 +126,173 @@ def add_item_to_inventory(db: Session, inventory_id: int, item_id: int, quantity
         )
 
 
+def get_or_create_actor_stat(db: Session, actor_id: int, stat_type: str):
+    actor_stat = db.query(ActorStatModel).filter(
+        ActorStatModel.actor_id == actor_id,
+        ActorStatModel.stat_type == stat_type
+    ).first()
+
+    if actor_stat:
+        return actor_stat
+
+    actor_stat = ActorStatModel(
+        actor_id=actor_id,
+        stat_type=stat_type,
+        value=0
+    )
+    db.add(actor_stat)
+    db.flush()
+
+    return actor_stat
+
+
+def add_actor_stat_value(db: Session, actor_id: int, stat_type: str, delta: int):
+    if delta == 0:
+        return
+
+    actor_stat = get_or_create_actor_stat(
+        db=db,
+        actor_id=actor_id,
+        stat_type=stat_type
+    )
+    actor_stat.value += int(delta)
+
+
+def get_level_base_stat_dict(db: Session, level: int):
+    rows = db.query(LevelBaseStatModel).filter(
+        LevelBaseStatModel.char_level == level
+    ).all()
+
+    return {
+        row.stat_type: row.value
+        for row in rows
+    }
+
+
+def apply_level_stat_growth(db: Session, character: CharacterModel, old_level: int, new_level: int):
+    """
+    레벨업 시 MAX_HP/MAX_MP는 LevelMaster 차이만큼 증가시키고,
+    ATK/DEF/INT 등은 LevelBaseStat의 이전 레벨 대비 증가분만 적용한다.
+    """
+    old_master = db.query(LevelMasterModel).filter(
+        LevelMasterModel.level == old_level
+    ).first()
+    new_master = db.query(LevelMasterModel).filter(
+        LevelMasterModel.level == new_level
+    ).first()
+
+    if old_master and new_master:
+        hp_delta = int(new_master.max_hp - old_master.max_hp)
+        mp_delta = int(new_master.max_mp - old_master.max_mp)
+
+        add_actor_stat_value(db, character.actor_id, "MAX_HP", hp_delta)
+        #add_actor_stat_value(db, character.actor_id, "HP", hp_delta)
+        add_actor_stat_value(db, character.actor_id, "MAX_MP", mp_delta)
+        #add_actor_stat_value(db, character.actor_id, "MP", mp_delta)
+
+    old_base = get_level_base_stat_dict(db, old_level)
+    new_base = get_level_base_stat_dict(db, new_level)
+
+    for stat_type in set(old_base.keys()) | set(new_base.keys()):
+        delta = int(new_base.get(stat_type, 0) - old_base.get(stat_type, 0))
+        add_actor_stat_value(db, character.actor_id, stat_type, delta)
+
+
+def learn_level_skills(db: Session, character: CharacterModel, level: int):
+    reward_rows = db.query(ProjectLevelSkillRewardModel).filter(
+        ProjectLevelSkillRewardModel.level == level
+    ).all()
+
+    learned_skills = []
+
+    for reward_row in reward_rows:
+        existing = db.query(CharacterSkillModel).filter(
+            CharacterSkillModel.char_id == character.actor_id,
+            CharacterSkillModel.skill_id == reward_row.skill_id
+        ).first()
+
+        skill = db.query(SkillModel).filter(
+            SkillModel.id == reward_row.skill_id
+        ).first()
+
+        if not skill:
+            continue
+
+        if existing:
+            if existing.skill_level < reward_row.skill_level:
+                existing.skill_level = reward_row.skill_level
+            continue
+
+        db.add(
+            CharacterSkillModel(
+                char_id=character.actor_id,
+                skill_id=reward_row.skill_id,
+                skill_level=reward_row.skill_level
+            )
+        )
+
+        learned_skills.append(
+            {
+                "skill_id": skill.id,
+                "skill_name": skill.name,
+                "skill_level": float(reward_row.skill_level),
+                "description": skill.description,
+            }
+        )
+
+    return learned_skills
+
+
+def process_level_up(db: Session, character: CharacterModel):
+    """
+    Character.exp는 현재 레벨에서 다음 레벨까지의 진행 경험치로 사용한다.
+    LevelMaster.max_exp_to_next 이상이면 레벨을 올리고 남은 EXP를 보존한다.
+    """
+    level_ups = []
+    learned_skills = []
+
+    # 무한 루프 방지용. 현재 프로젝트 레벨 테이블 규모에서는 충분하다.
+    for _ in range(20):
+        current_master = db.query(LevelMasterModel).filter(
+            LevelMasterModel.level == character.level
+        ).first()
+        next_master = db.query(LevelMasterModel).filter(
+            LevelMasterModel.level == character.level + 1
+        ).first()
+
+        if not current_master or not next_master:
+            break
+
+        if character.exp < current_master.max_exp_to_next:
+            break
+
+        character.exp -= current_master.max_exp_to_next
+        old_level = character.level
+        character.level += 1
+        new_level = character.level
+
+        apply_level_stat_growth(
+            db=db,
+            character=character,
+            old_level=old_level,
+            new_level=new_level
+        )
+
+        level_ups.append(new_level)
+        learned_skills.extend(
+            learn_level_skills(
+                db=db,
+                character=character,
+                level=new_level
+            )
+        )
+
+    return {
+        "level_ups": level_ups,
+        "learned_skills": learned_skills,
+    }
+
+
 def give_quest_reward(db: Session, character: CharacterModel, quest_id: int):
     reward = get_quest_reward_summary(db, quest_id)
 
@@ -138,7 +309,13 @@ def give_quest_reward(db: Session, character: CharacterModel, quest_id: int):
             quantity=item["quantity"]
         )
 
+    level_result = process_level_up(db, character)
+
+    reward["level_ups"] = level_result["level_ups"]
+    reward["learned_skills"] = level_result["learned_skills"]
+
     return reward
+
 
 def create_battle_log(
     db: Session,
@@ -150,13 +327,12 @@ def create_battle_log(
     message: str
 ):
     battle_log = BattleLogModel(
-    char_id=char_id,
-    quest_id=quest_id,
-    monster_actor_id=monster_actor_id,
-    result=result,
-    gained_exp=gained_exp,
-    message=message,
-    battle_time=datetime.now()
+        char_id=char_id,
+        quest_id=quest_id,
+        monster_actor_id=monster_actor_id,
+        result=result,
+        gained_exp=gained_exp,
+        message=message,
+        battle_time=datetime.now()
     )
-
     db.add(battle_log)

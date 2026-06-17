@@ -1,10 +1,9 @@
 from sqlalchemy import Column, String, Integer, Boolean, ForeignKey, Text, Float, DateTime
 from database import Base
-from sqlalchemy import text
 
 
 # ==========================================
-# SQLAlchemy ORM Models (MyRPG Schema 적용)
+# Core Models
 # ==========================================
 
 class UserModel(Base):
@@ -32,6 +31,10 @@ class CharacterModel(Base):
     active = Column(Boolean, default=False, nullable=False)
 
 
+# ==========================================
+# Item / Inventory Models
+# ==========================================
+
 class ItemModel(Base):
     __tablename__ = "Item"
 
@@ -43,38 +46,26 @@ class ItemModel(Base):
     capacity = Column(Integer, default=-1)
 
 
-class SpecimenModel(Base):
-    __tablename__ = "Specimen"
+class InventoryModel(Base):
+    __tablename__ = "Inventory"
 
-    type = Column(String(50), primary_key=True)
-    name = Column(String(255))
-    description = Column(Text)
-
-
-class CharacterSpecimenModel(Base):
-    __tablename__ = "CharacterSpecimen"
-
-    char_id = Column(Integer, ForeignKey("Character.actor_id"), primary_key=True)
-    type = Column(String(50), ForeignKey("Specimen.type"), primary_key=True)
-    fraction = Column(Float, default=100)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    owner_id = Column(Integer, ForeignKey("Character.actor_id"), nullable=False)
+    type = Column(String(50), nullable=False)
+    capacity = Column(Integer, nullable=False)
 
 
-class JobModel(Base):
-    __tablename__ = "Job"
+class InventoryItemModel(Base):
+    __tablename__ = "InventoryItem"
 
-    type = Column(String(50), primary_key=True)
-    name = Column(String(255))
-    description = Column(Text)
+    inventory_id = Column(Integer, ForeignKey("Inventory.id"), primary_key=True)
+    item_id = Column(Integer, ForeignKey("Item.id"), primary_key=True)
+    quantity = Column(Integer, nullable=False, default=1)
 
 
-class CharacterJobModel(Base):
-    __tablename__ = "CharacterJob"
-
-    type = Column(String(50), ForeignKey("Job.type"), primary_key=True)
-    char_id = Column(Integer, ForeignKey("Character.actor_id"), primary_key=True)
-    obtain_date = Column(DateTime)
-    active = Column(Boolean, default=False)
-
+# ==========================================
+# Stat / Level / Race / Job / Skill Models
+# ==========================================
 
 class StatModel(Base):
     __tablename__ = "Stat"
@@ -109,6 +100,14 @@ class LevelBaseStatModel(Base):
     value = Column(Integer, nullable=False)
 
 
+class SpecimenModel(Base):
+    __tablename__ = "Specimen"
+
+    type = Column(String(50), primary_key=True)
+    name = Column(String(255))
+    description = Column(Text)
+
+
 class SpecimenBaseStatModel(Base):
     __tablename__ = "SpecimenBaseStat"
 
@@ -117,21 +116,29 @@ class SpecimenBaseStatModel(Base):
     value = Column(Integer, nullable=False)
 
 
-class InventoryModel(Base):
-    __tablename__ = "Inventory"
+class CharacterSpecimenModel(Base):
+    __tablename__ = "CharacterSpecimen"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    owner_id = Column(Integer, ForeignKey("Character.actor_id"), nullable=False)
-    type = Column(String(50), nullable=False)
-    capacity = Column(Integer, nullable=False)
+    char_id = Column(Integer, ForeignKey("Character.actor_id"), primary_key=True)
+    type = Column(String(50), ForeignKey("Specimen.type"), primary_key=True)
+    fraction = Column(Float, default=1.0)
 
 
-class InventoryItemModel(Base):
-    __tablename__ = "InventoryItem"
+class JobModel(Base):
+    __tablename__ = "Job"
 
-    inventory_id = Column(Integer, ForeignKey("Inventory.id"), primary_key=True)
-    item_id = Column(Integer, ForeignKey("Item.id"), primary_key=True)
-    quantity = Column(Integer, nullable=False, default=1)
+    type = Column(String(50), primary_key=True)
+    name = Column(String(255))
+    description = Column(Text)
+
+
+class CharacterJobModel(Base):
+    __tablename__ = "CharacterJob"
+
+    type = Column(String(50), ForeignKey("Job.type"), primary_key=True)
+    char_id = Column(Integer, ForeignKey("Character.actor_id"), primary_key=True)
+    obtain_date = Column(DateTime)
+    active = Column(Boolean, default=False)
 
 
 class SkillModel(Base):
@@ -152,8 +159,9 @@ class CharacterSkillModel(Base):
     char_id = Column(Integer, ForeignKey("Character.actor_id"), primary_key=True)
     skill_level = Column(Float, nullable=False, default=1.0)
 
+
 # ==========================================
-# Quest / Reward / Monster Models
+# Quest / Reward / Monster / NPC Models
 # ==========================================
 
 class QuestModel(Base):
@@ -174,7 +182,7 @@ class CharacterQuestModel(Base):
     quest_id = Column(Integer, ForeignKey("Quest.id"), primary_key=True)
     char_id = Column(Integer, ForeignKey("Character.actor_id"), primary_key=True)
     start_time = Column(DateTime)
-    status = Column(String(50), nullable=False)
+    status = Column(String(50), nullable=False)  # active / completed / failed
     current_step = Column(Integer, nullable=False, default=0)
 
 
@@ -226,6 +234,58 @@ class QuestRewardModel(Base):
     quest_id = Column(Integer, ForeignKey("Quest.id"), primary_key=True)
     reward_id = Column(Integer, ForeignKey("Reward.id"), primary_key=True)
 
+
+class VillagerModel(Base):
+    __tablename__ = "Villager"
+
+    npc_id = Column(Integer, ForeignKey("Actor.id"), primary_key=True)
+    shop_id = Column(Integer, ForeignKey("Shop.id"))
+
+
+class VillagerQuestModel(Base):
+    __tablename__ = "VillagerQuest"
+
+    villager_id = Column(Integer, ForeignKey("Villager.npc_id"), primary_key=True)
+    quest_id = Column(Integer, ForeignKey("Quest.id"), primary_key=True)
+
+
+class ProjectVillagerInfoModel(Base):
+    __tablename__ = "ProjectVillagerInfo"
+
+    villager_id = Column(Integer, ForeignKey("Villager.npc_id"), primary_key=True)
+    name = Column(String(255), nullable=False)
+    role = Column(String(50), nullable=False)
+    description = Column(Text)
+
+
+class ProjectLevelSkillRewardModel(Base):
+    __tablename__ = "ProjectLevelSkillReward"
+
+    level = Column(Integer, primary_key=True)
+    skill_id = Column(Integer, ForeignKey("Skill.id"), primary_key=True)
+    skill_level = Column(Float, nullable=False, default=1.0)
+    description = Column(Text)
+
+
+# ==========================================
+# Battle Models
+# ==========================================
+
+class BattleEncounterModel(Base):
+    __tablename__ = "BattleEncounter"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    char_id = Column(Integer, ForeignKey("Character.actor_id"), nullable=False)
+    quest_id = Column(Integer, ForeignKey("Quest.id"), nullable=False)
+    monster_actor_id = Column(Integer, ForeignKey("Monster.actor_id"), nullable=False)
+    monster_current_hp = Column(Integer, nullable=False)
+    monster_max_hp = Column(Integer, nullable=False)
+    status = Column(String(50), nullable=False, default="active")
+    turn_count = Column(Integer, nullable=False, default=0)
+    started_at = Column(DateTime)
+    ended_at = Column(DateTime)
+
+
 class BattleLogModel(Base):
     __tablename__ = "BattleLog"
 
@@ -236,4 +296,4 @@ class BattleLogModel(Base):
     result = Column(String(50), nullable=False)
     gained_exp = Column(Integer, nullable=False, default=0)
     message = Column(String(255))
-    battle_time = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
+    battle_time = Column(DateTime)

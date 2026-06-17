@@ -3,7 +3,7 @@ from typing import Optional
 
 
 # ==========================================
-# Pydantic Schemas (API 입출력 검증용)
+# User / Auth Schemas
 # ==========================================
 
 class UserLogin(BaseModel):
@@ -28,6 +28,10 @@ class UserResponse(BaseModel):
 class UserDeletionResponse(BaseModel):
     user_id: str
 
+
+# ==========================================
+# Character / Item Schemas
+# ==========================================
 
 class CharacterCreate(BaseModel):
     character_name: str
@@ -66,8 +70,9 @@ class ItemResponse(ItemCreate):
     class Config:
         orm_mode = True
 
+
 # ==========================================
-# Quest / Battle Schemas
+# Quest / Reward Schemas
 # ==========================================
 
 class QuestTargetResponse(BaseModel):
@@ -90,6 +95,7 @@ class QuestSummaryResponse(BaseModel):
     max_steps: int
     status: Optional[str] = None
     current_step: int = 0
+    source: Optional[str] = None
     target: Optional[QuestTargetResponse] = None
     reward_exp: int = 0
     reward_items: list[QuestRewardItemResponse] = []
@@ -102,22 +108,79 @@ class QuestAcceptResponse(BaseModel):
     message: str
 
 
+
+
+class LearnedSkillResponse(BaseModel):
+    skill_id: int
+    skill_name: str
+    skill_level: float
+    description: Optional[str] = None
+
+
 class BattleRewardResponse(BaseModel):
     exp: int = 0
     items: list[QuestRewardItemResponse] = []
+    level_ups: list[int] = []
+    learned_skills: list[LearnedSkillResponse] = []
 
 
-class BattleResponse(BaseModel):
+# ==========================================
+# NPC Schemas
+# ==========================================
+
+class VillagerResponse(BaseModel):
+    villager_id: int
+    name: str
+    role: str
+    description: Optional[str] = None
+
+
+# ==========================================
+# Encounter / Battle Schemas
+# ==========================================
+
+class SkillOptionResponse(BaseModel):
+    skill_id: int
+    skill_name: str
+    description: Optional[str] = None
+    skill_level: float
+    mp_cost: int
+    cooldown_sec: int
+
+
+class EncounterResponse(BaseModel):
+    encounter_id: int
+    quest_id: int
+    quest_name: str
+    monster_actor_id: int
+    monster_name: str
+    monster_current_hp: int
+    monster_max_hp: int
+    status: str
+    turn_count: int
+    skills: list[SkillOptionResponse] = []
+
+
+class AttackRequest(BaseModel):
+    skill_id: int
+
+
+class AttackResponse(BaseModel):
+    encounter_id: int
     quest_id: int
     quest_name: str
     monster_name: str
-    victory: bool
-    before_step: int
+    skill_name: str
+    damage: int
+    monster_current_hp: int
+    monster_max_hp: int
+    monster_dead: bool
+    quest_status: str
     current_step: int
     required_count: int
-    quest_status: str
     reward: BattleRewardResponse
     message: str
+
 
 class BattleLogResponse(BaseModel):
     id: int

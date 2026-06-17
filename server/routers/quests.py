@@ -5,13 +5,11 @@ from sqlalchemy.orm import Session
 from auth import get_current_user
 from database import get_db
 from models import CharacterQuestModel, QuestModel
-from schemas import QuestAcceptResponse, BattleResponse, BattleLogResponse
+from schemas import QuestAcceptResponse
 from services.quest_service import (
     get_active_character_or_none,
     get_quest_target,
     get_quest_reward_summary,
-    give_quest_reward,
-    create_battle_log,
 )
 
 router = APIRouter(prefix="/users/{user_id}/quests", tags=["Quests"])
@@ -31,15 +29,15 @@ def check_user_permission(user_id: str, current_user):
         )
 
 
-def build_quest_summary(db: Session, quest_row, status=None, current_step=0):
-    target_row = get_quest_target(db, quest_row["quest_id"])
-    reward = get_quest_reward_summary(db, quest_row["quest_id"])
+def build_quest_summary(db: Session, quest_row, status=None, current_step=0, source=None):
+    target_row = get_quest_target(db=db, quest_id=quest_row["quest_id"])
+    reward = get_quest_reward_summary(db=db, quest_id=quest_row["quest_id"])
 
     target = None
     if target_row:
         target = {
             "monster_actor_id": target_row["monster_actor_id"],
-            "monster_name": target_row["monster_name"] or f"Monster {target_row['monster_actor_id']}",
+            "monster_name": target_row["monster_name"],
             "required_count": target_row["required_count"],
         }
 
@@ -51,6 +49,7 @@ def build_quest_summary(db: Session, quest_row, status=None, current_step=0):
         "max_steps": quest_row["max_steps"],
         "status": status,
         "current_step": current_step,
+        "source": source,
         "target": target,
         "reward_exp": reward["exp"],
         "reward_items": reward["items"],
@@ -97,12 +96,17 @@ def get_available_quests(
                   AND cq.status IN ('active', 'completed')
                   AND q.is_repeatable = FALSE
             )
+            AND NOT EXISTS (
+                SELECT 1
+                FROM VillagerQuest vq
+                WHERE vq.quest_id = q.id
+            )
             ORDER BY q.id
         """),
         {"char_id": character.actor_id}
     ).mappings().all()
 
-    return [build_quest_summary(db, row) for row in rows]
+    return [build_quest_summary(db, row, source="system") for row in rows]
 
 
 @router.get("/my")
@@ -126,7 +130,12 @@ def get_my_quests(
                 q.max_steps,
                 q.type,
                 cq.status,
-                cq.current_step
+                cq.current_step,
+                CASE
+                    WHEN EXISTS (SELECT 1 FROM VillagerQuest vq WHERE vq.quest_id = q.id)
+                    THEN 'npc'
+                    ELSE 'system'
+                END AS source
             FROM CharacterQuest cq
             JOIN Quest q ON cq.quest_id = q.id
             WHERE cq.char_id = :char_id
@@ -140,7 +149,8 @@ def get_my_quests(
             db=db,
             quest_row=row,
             status=row["status"],
-            current_step=row["current_step"]
+            current_step=row["current_step"],
+            source=row["source"]
         )
         for row in rows
     ]
@@ -197,199 +207,3 @@ def accept_quest(
         status="active",
         message="퀘스트를 수락했습니다."
     )
-
-
-@router.post("/{quest_id}/battle", response_model=BattleResponse)
-def run_quest_battle(
-    user_id: str,
-    quest_id: int,
-    current_user=Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    check_user_permission(
-        user_id=user_id,
-        current_user=current_user
-    )
-
-    character = get_active_character_or_none(
-        db=db,
-        user_id=user_id
-    )
-
-    if not character:
-        raise HTTPException(
-            status_code=400,
-            detail="활성 캐릭터가 없습니다."
-        )
-
-    character_quest = db.query(CharacterQuestModel).filter(
-        CharacterQuestModel.quest_id == quest_id,
-        CharacterQuestModel.char_id == character.actor_id
-    ).first()
-
-    if not character_quest:
-        raise HTTPException(
-            status_code=400,
-            detail="먼저 퀘스트를 수락해야 합니다."
-        )
-
-    # 보상 중복 지급 방지
-    if character_quest.status == "completed":
-        raise HTTPException(
-            status_code=400,
-            detail="이미 완료한 퀘스트입니다. 보상은 중복 지급되지 않습니다."
-        )
-
-    if character_quest.status != "active":
-        raise HTTPException(
-            status_code=400,
-            detail="진행 중인 퀘스트만 전투를 실행할 수 있습니다."
-        )
-
-    quest = db.query(QuestModel).filter(
-        QuestModel.id == quest_id
-    ).first()
-
-    if not quest:
-        raise HTTPException(
-            status_code=404,
-            detail="퀘스트를 찾을 수 없습니다."
-        )
-
-    target = get_quest_target(
-        db=db,
-        quest_id=quest_id
-    )
-
-    if not target:
-        raise HTTPException(
-            status_code=400,
-            detail="목표 몬스터가 연결되지 않은 퀘스트입니다."
-        )
-
-    try:
-        before_step = character_quest.current_step
-        required_count = int(target["required_count"])
-
-        # 전투 결과는 현재 데모에서는 항상 승리 처리
-        character_quest.current_step += 1
-
-        reward = {
-            "exp": 0,
-            "items": []
-        }
-
-        monster_name = target["monster_name"]
-        monster_actor_id = target["monster_actor_id"]
-
-        if character_quest.current_step >= required_count:
-            character_quest.current_step = required_count
-            character_quest.status = "completed"
-
-            reward = give_quest_reward(
-                db=db,
-                character=character,
-                quest_id=quest_id
-            )
-
-            message = "퀘스트 완료! 보상을 획득했습니다."
-        else:
-            message = f"{monster_name} 처치 성공!"
-
-        # BattleLog 저장
-        create_battle_log(
-            db=db,
-            char_id=character.actor_id,
-            quest_id=quest_id,
-            monster_actor_id=monster_actor_id,
-            result="victory",
-            gained_exp=reward["exp"],
-            message=message
-        )
-
-        db.commit()
-
-        return BattleResponse(
-            quest_id=quest_id,
-            quest_name=quest.name,
-            monster_name=monster_name,
-            victory=True,
-            before_step=before_step,
-            current_step=character_quest.current_step,
-            required_count=required_count,
-            quest_status=character_quest.status,
-            reward=reward,
-            message=message
-        )
-
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=f"전투 처리 중 오류가 발생하여 롤백되었습니다: {str(e)}"
-        )
-    
-@router.get("/battle-logs", response_model=list[BattleLogResponse])
-def get_battle_logs(
-    user_id: str,
-    current_user=Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    check_user_permission(
-        user_id=user_id,
-        current_user=current_user
-    )
-
-    character = get_active_character_or_none(
-        db=db,
-        user_id=user_id
-    )
-
-    if not character:
-        raise HTTPException(
-            status_code=400,
-            detail="활성 캐릭터가 없습니다."
-        )
-
-    rows = db.execute(
-        text("""
-            SELECT
-                bl.id,
-                bl.char_id,
-                c.character_name,
-                bl.quest_id,
-                q.name AS quest_name,
-                bl.monster_actor_id,
-                COALESCE(qmt.target_name, CONCAT('Monster ', bl.monster_actor_id)) AS monster_name,
-                bl.result,
-                bl.gained_exp,
-                bl.message,
-                DATE_FORMAT(bl.battle_time, '%Y-%m-%d %H:%i:%s') AS battle_time
-            FROM BattleLog bl
-            JOIN `Character` c ON bl.char_id = c.actor_id
-            LEFT JOIN Quest q ON bl.quest_id = q.id
-            LEFT JOIN QuestMonsterTarget qmt
-                ON bl.quest_id = qmt.quest_id
-               AND bl.monster_actor_id = qmt.monster_actor_id
-            WHERE bl.char_id = :char_id
-            ORDER BY bl.battle_time DESC, bl.id DESC
-        """),
-        {"char_id": character.actor_id}
-    ).mappings().all()
-
-    return [
-        BattleLogResponse(
-            id=row["id"],
-            char_id=row["char_id"],
-            character_name=row["character_name"],
-            quest_id=row["quest_id"],
-            quest_name=row["quest_name"],
-            monster_actor_id=row["monster_actor_id"],
-            monster_name=row["monster_name"],
-            result=row["result"],
-            gained_exp=row["gained_exp"],
-            message=row["message"],
-            battle_time=row["battle_time"]
-        )
-        for row in rows
-    ]
